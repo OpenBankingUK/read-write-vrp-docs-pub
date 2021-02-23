@@ -1,4 +1,4 @@
-# Domestic VRPS - v1.0.0-draft1 <!-- omit in toc -->
+# Domestic VRPS - v3.1.8 <!-- omit in toc -->
 
 - [Overview](#overview)
 - [Endpoints](#endpoints)
@@ -25,9 +25,9 @@ This resource description should be read in conjunction with a compatible Paymen
 
 | Resource |HTTP Operation |Endpoint |Mandatory |Scope |Grant Type |Message Signing |Idempotency Key |Request Object |Response Object |
 | -------- |-------------- |-------- |----------- |----- |---------- |--------------- |--------------- |-------------- |--------------- |
-| domestic-vrps |POST |POST /domestic-vrps | Conditional |vrp-consents:sweeping, vrp-consents:other |Authorization Code |Signed Request Signed Response |Yes | OBDomesticVRPRequest |OBDomesticVRPResponse |
-| domestic-vrps |GET |GET /domestic-vrps/{DomesticVRPId} | Conditional |vrp-consents:sweeping, vrp-consents:other |Client Credentials |Signed Response |No |NA |OBDomesticVRPResponse |
-| domestic-vrps |GET |GET /domestic-vrps/{DomesticVRPId}/payment-details | Optional |vrp-consents:sweeping, vrp-consents:other |Client Credentials |Signed Response |No |NA |OBDomesticVRPRequestDetailResponse |
+| domestic-vrps |POST |POST /domestic-vrps | Conditional |payments |Authorization Code |Signed Request Signed Response |Yes | OBDomesticVRPRequest |OBDomesticVRPResponse |
+| domestic-vrps |GET |GET /domestic-vrps/{DomesticVRPId} | Conditional |payments |Client Credentials |Signed Response |No |NA |OBDomesticVRPResponse |
+| domestic-vrps |GET |GET /domestic-vrps/{DomesticVRPId}/payment-details | Optional |payments |Client Credentials |Signed Response |No |NA |OBDomesticVRPRequestDetailResponse |
 
 ### POST /domestic-vrps
 
@@ -39,9 +39,15 @@ This request is an instruction to the ASPSP to begin the domestic single immedia
 
 The TPP **must** ensure that the `Initiation` and `Risk` section matches the values specified in the consent.
 
+The ASPSP **must** ensure that the payment instruction adheres to the limitations set by the corresponding VRP consent's `ControlParameters`.
+
+When a payment would breach a limitation set by one or more `ControlParameters`, the ASPSP **must** return an error with code `UK.OBIE.Rules.FailsControlParameters` and pass in the control parameter field that caused the error in the `Field` field of the error message.
+
 If the `CreditorAccount` was not specified in the the consent, the `CreditorAccount` must be specified in the instruction.
 
 The TPP **must** ensure that the end-point is called with the same scope as the one used for the corresponding consent.
+
+The ASPSP **must** reject a payment that has `Data.Instruction.SupplementaryData` that it cannot process.
 
 #### Status
 
@@ -124,12 +130,16 @@ The definitions for the status:
 | ---- |-----|---------- |------|
 | __InstructionIdentification__ (1..1) | `Initiation. InstructionIdentification` |Unique identification as assigned by an instructing party for an instructed party to unambiguously identify the instruction. Usage: the instruction identification is a point to point reference that can be used between the instructing party and the instructed party to refer to the individual instruction. It can be included in several messages related to the instruction. |Max35Text
 | __EndToEndIdentification__ (1..1) | `EndToEndIdentification` |Unique identification assigned by the initiating party to unambiguously identify the transaction. This identification is passed on, unchanged, throughout the entire end-to-end chain. Usage: The end-to-end identification can be used for reconciliation or to link tasks relating to the transaction. It can be included in several messages related to the transaction. OB: The Faster Payments Scheme can only access 31 characters for the EndToEndIdentification field. |Max35Text
+| __RemittanceInformation__ (0..1) | `RemittanceInformation` |Information supplied to enable the matching of an entry with the items that the transfer is intended to settle, such as commercial invoices in an accounts' receivable system.
+| __Unstructured__ (0..1) | `RemittanceInformation. Unstructured` |Information supplied to enable the matching/reconciliation of an entry with the items that the payment is intended to settle, such as commercial invoices in an accounts' receivable system, in an unstructured form. | Max140Text
+| __Reference__ (0..1) | `RemittanceInformation. Reference` |Unique reference, as assigned by the creditor, to unambiguously refer to the payment transaction. The PISP must populate this with the same value as specified in the ControlParameters.Reference field of the consent. |Max35Text
 | __LocalInstrument__ (0..1) | `LocalInstrument` |User community specific instrument. Usage: This element is used to specify a local instrument, local clearing option and/or further qualify the service or service level. |OBExternalLocalInstrument1Code
 | __InstructedAmount__ (1..1) | `InstructedAmount` |Amount of money to be moved between the debtor and creditor, before deduction of charges, expressed in the currency as ordered by the initiating party. Usage: This amount has to be transported unchanged through the transaction chain. | OBActiveOrHistoricCurrencyAndAmount
 | __Amount__ (1..1) |`InstructedAmount. Amount` |A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217. |OBActiveCurrencyAndAmount_SimpleType | `^\d{1,13}$\|^\d{1,13}\.\d{1,5}$`
 | __Currency__ (1..1) | `InstructedAmount. Currency` |A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds". |ActiveOrHistoricCurrencyCode | `^[A-Z]{3,3}$`
 | __CreditorAgent__ (0..1) | `CreditorAgent` | Financial institution servicing an account for the creditor.     | OBBranchAndFinancialInstitutionIdentification6
 | __CreditorAccount__ (1..1) | `CreditorAccount`   |Unambiguous identification of the account of the creditor to which a credit entry will be posted as a result of the payment transaction.       |OBCashAccountCreditor3
+| __SupplementaryData__ (0..1) | `SupplementaryData` | Additional information that can not be captured in the structured fields and/or any other specific block  | *
 
 ### OBDomesticVRPRequest
 
@@ -138,6 +148,7 @@ The definitions for the status:
 | Name |Path |Definition | Type |
 | ---- |-----|---------- |------|
 | __Data__ (1..1) | `Data`
+| __PSUAuthenticationMethod__ (1..1) | `Data. PSUAuthenticationMethod` | The authentication method that was used to authenicate the PSU. | OBVRPAuthenticationMethods - Namespaced Enumeration
 | __ConsentId__ (1..1) | `Data. ConsentId` | Identifier for the Domestic VRP Consent that this payment is made under | Max128Text|
 | __Initiation__ (1..1) | `Data. Initiation` | The parameters of the VRP consent that should remain unchanged for each payment under this VRP. | OBDomesticVRPInitiation
 | __Instruction__ (1..1) | `Data. Instruction` | Specific instructions for this particular payment within the VRP consent | [OBDomesticVRPInstruction](#OBDomesticVRPInstruction)
@@ -157,11 +168,10 @@ The definitions for the status:
 | __StatusUpdateDateTime__ (1..1) | `Data. StatusUpdateDateTime` |Date and time at which the resource status was updated. |ISODateTime
 | __ExpectedExecutionDateTime__ (0..1) | `Data. ExpectedExecutionDateTime` |Expected execution date and time for the payment resource. |ISODateTime
 | __ExpectedSettlementDateTime__ (0..1) | `Data. ExpectedSettlementDateTime` |Expected settlement date and time for the payment resource. |ISODateTime
-| __Refund__ (1..1) | `Data. Refund` | Unambiguous identification of the refund account to which a refund will be made as a result of the transaction. | OBDomesticRefundAccount1
+| __Refund__ (0..1) | `Data. Refund` | Unambiguous identification of the refund account to which a refund will be made as a result of the transaction. This object is populated only when `Data. ReadRefundAccount` is set to `Yes` in the consent. | OBDomesticRefundAccount1
 | __Charges__ (0..n) | `Data. Charges` |Set of elements used to provide details of a charge for the payment initiation. | OBCharge2
 | __Initiation__ (1..1) | `Data. Initiation` | The parameters of the VRP consent that should remain unchanged for each payment under this VRP. | OBDomesticVRPInitiation
 | __Instruction__ (1..1) | `Data. Instruction` | Specific instructions for this particular payment within the VRP consent | OBDomesticVRPInstruction
-| __MultiAuthorisation__ (0..1) | `Data. MultiAuthorisation` |The multiple authorisation flow response from the ASPSP. |OBMultiAuthorisation1|
 | __DebtorAccount__ (1..1) | `Data.DebtorAccount` | The approved DebtorAccount that the payment was made from. | OBCashAccountDebtorWithName
 
 ### OBDomesticVRPDetails

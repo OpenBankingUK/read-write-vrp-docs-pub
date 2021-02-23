@@ -1,4 +1,4 @@
-# Domestic VRP consents - v1.0.0-draft1 <!-- omit in toc -->
+# Domestic VRP consents - v3.1.8 <!-- omit in toc -->
 
 - [Overview](#overview)
 - [Endpoints](#endpoints)
@@ -13,6 +13,11 @@
   - [OBBranchAndFinancialInstitutionIdentification6](#obbranchandfinancialinstitutionidentification6)
   - [OBDomesticVRPInitiation](#obdomesticvrpinitiation)
   - [OBDomesticVRPControlParameters](#obdomesticvrpcontrolparameters)
+    - [Examples of Periodic Limits](#examples-of-periodic-limits)
+      - [Example 1](#example-1)
+      - [Example 2](#example-2)
+      - [Example 3](#example-3)
+      - [Example 4](#example-4)
   - [OBRisk1](#obrisk1)
   - [OBDomesticVRPConsentRequest](#obdomesticvrpconsentrequest)
   - [OBDomesticVRPConsentResponse](#obdomesticvrpconsentresponse)
@@ -33,10 +38,10 @@ The ASPSP may use the scope to limit to functionality to sweeping or non-sweepin
 
 | Resource | Operation |Endpoint |Mandatory  |Scope |Grant Type |Message Signing |Idempotency Key |Request Object |Response Object |
 | -------- |-------------- |-------- |----------- |----- |---------- |--------------- |--------------- |-------------- |--------------- |
-|domestic-vrp-consents |POST |POST /domestic-vrp-consents |Mandatory |vrp-consents:sweeping, vrp-consents:other |Client Credentials |Signed Request Signed Response |Yes | OBDomesticVRPConsentRequest |OBDomesticVRPConsentResponse |
-|domestic-vrp-consents |GET |GET /domestic-vrp-consents/{ConsentId} |Mandatory |vrp-consents:sweeping, vrp-consents:other |Client Credentials |Signed Response |No |NA |OBDomesticVRPConsentResponse |
-|domestic-vrp-consents |DELETE |DELETE /domestic-vrp-consents/{ConsentId} |Mandatory |vrp-consents:sweeping, vrp-consents:other |Client Credentials | NA |No |NA |None |
-|domestic-vrp-consents |POST |POST /domestic-vrp-consents/{ConsentId}/funds-confirmation |Mandatory |vrp-consents:sweeping, vrp-consents:other |Authorization Code |Signed Request Signed Response |No |OBVRPFundsConfirmationRequest |OBVRPFundsConfirmationResponse |
+|domestic-vrp-consents |POST |POST /domestic-vrp-consents |Mandatory | payments |Client Credentials |Signed Request Signed Response |Yes | OBDomesticVRPConsentRequest |OBDomesticVRPConsentResponse |
+|domestic-vrp-consents |GET |GET /domestic-vrp-consents/{ConsentId} |Mandatory | payments |Client Credentials |Signed Response |No |NA |OBDomesticVRPConsentResponse |
+|domestic-vrp-consents |DELETE |DELETE /domestic-vrp-consents/{ConsentId} |Mandatory | payments |Client Credentials | NA |No |NA |None |
+|domestic-vrp-consents |POST |POST /domestic-vrp-consents/{ConsentId}/funds-confirmation |Mandatory | payments |Authorization Code |Signed Request Signed Response |No |OBVRPFundsConfirmationRequest |OBVRPFundsConfirmationResponse |
 
 ### POST /domestic-vrp-consents
 
@@ -52,6 +57,10 @@ The default/initial Status of the resource is set to `AwaitingAuthorisation`.
 
 If the parameters specified by the TPP in this resource are not valid, or fail any rules, the ASPSP must return a 400 Bad Request. In such a situation a resource is not created.
 
+The ASPSP **must** allow a PSU to have multiple VRP consents for a given account. This could include multiple consents with the same PISP.
+
+The ASPSP **must** reject a consent request that has `Data.ControlParameters.SupplementaryData` that it cannot process.
+
 ### GET /domestic-vrp-consents/{ConsentId}
 
 A TPP can retrieve a VRP consent resource that they have created to check its status at any point of time using this API.
@@ -64,7 +73,7 @@ A TPP can delete a VRP consent resource that they have created by calling this A
 
 This API endpoint allows the TPP to ask an ASPSP to confirm funds on the `DebtorAccount` associated with the `domestic-vrp-consent`.
 
-An ASPSP can only respond to a funds confirmation request if the resource has a Status of `Authorized`.
+An ASPSP can only respond to a funds confirmation request if the resource has a Status of `Authorised`.
 
 If resource has any other Status, the ASPSP must respond with a 400 (Bad Request) and a `UK.OBIE.Resource.InvalidConsentStatus` error code.
 
@@ -150,6 +159,9 @@ The data dictionary section gives the detail on the payload content for the VRP 
 | __DebtorAccount__ (0..1) | `DebtorAccount` | Unambiguous identification of the account of the debtor to which a debit entry will be made as a result of the transaction. | [OBCashAccountDebtorWithName](#OBCashAccountDebtorWithName)
 | __CreditorAgent__ (0..1) | `CreditorAgent` | Financial institution servicing an account for the creditor.     | OBBranchAndFinancialInstitutionIdentification6
 | __CreditorAccount__ (0..1) | `CreditorAccount`   |Unambiguous identification of the account of the creditor to which a credit entry will be posted as a result of the payment transaction.       |OBCashAccountCreditor3
+| __RemittanceInformation__ (0..1) | `RemittanceInformation`   | Information supplied to enable the matching of an entry with the items that the transfer is intended to settle, such as commercial invoices in an accounts' receivable system. | Max140Text
+| __Unstructured__ (0..1) | `RemittanceInformation. Unstructured`   | Information supplied to enable the matching of an entry with the items that the transfer is intended to settle, such as commercial invoices in an accounts' receivable system | OBRemittanceInformation1
+| __Reference__ (0..1) | `RemittanceInformation. Reference`   | Unique reference, as assigned by the creditor, to unambiguously refer to the payment transaction. Usage: If available, the initiating party should provide this reference in the structured remittance information, to enable reconciliation by the creditor upon receipt of the amount of money. If the business context requires the use of a creditor reference or a payment remit identification, and only one identifier can be passed through the end-to-end chain, the creditor's reference or payment remittance identification should be quoted in the end-to-end transaction identification. | Max35Text
 
 ### OBDomesticVRPControlParameters
 
@@ -161,14 +173,100 @@ The VRP consent is a common class used in `domestic-payment-consents` requests a
 | ---- |-----|---------- |------|
 | __ValidFromDateTime__ (0..1) | `ValidFromDateTime` | Start date time for which the consent remains valid. | ISODateTime
 | __ValidToDateTime__ (0..1) | `ValidToDateTime`   | End date time for which the consent remains valid. | ISODateTime
-| __Reference__ (0..1) | `Reference`    |Unique reference, as assigned by the creditor, to unambiguously refer to the consent.     | Max35Text  
 | __MaximumIndividualAmount__ (0..1) | `ControlParameters. MaximumIndividualAmount` | Maximum amount that can be specified in a payment instruction under this VRP consent| ActiveOrHistoricCurrencyAndAmount  
 | __Amount__ (1..1) | `ControlParameters. MaximumIndividualAmount. Amount` | A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
 | __Currency__ (1..1) | `ControlParameters. MaximumIndividualAmount. Currency` | A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds".   | ActiveOrHistoricCurrencyCode  
-| __MaximumMonthlyAmount__ (0..1) | `ControlParameters. MaximumMonthlyAmount` | Maximum amount that can be specified in all payment instructions in a calendar month under this VRP consent |
-| __Amount__ (1..1)  | `ControlParameters. MaximumMonthlyAmount. Amount` | A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
-| __Currency__ (1..1) | `ControlParameters. MaximumMonthlyAmount. Currency` | A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds". | ActiveOrHistoricCurrencyCode
-| __VRPType__ (1..1) | `ControlParameters. VRPType` | The types of payments that can be made under this VRP consent. This can be used to indicate whether this include sweeping payment or other ecommerce payments. A value of `UK.OBIE.VRPType.Sweeping` can only be used when the API is called with the `vrp-consents:sweeping` scope. A value of `UK.OBIE.VRPType.Other` can only be used when the API is called with teh `vrp-consents:other` scope. | OBVRPConsentType - Namespaced Enumeration
+| __PeriodicLimits__ (0..*) | `ControlParameters. PeriodicLimits` | Maximum amount that can be specified in all payment instructions in a given period under this VRP consent. If the `PeriodAlignment` is `Calendar`, the limit is pro-rated in the first period to the remaining number of days |
+| __PeriodType__ (1..1) | `ControlParameters. PeriodicLimits. PeriodType` | Period type for this period limit | Day, Week, Fortnight, Month, Half-year, Year
+| __PeriodAlignment__ (1..1) | `ControlParameters. PeriodicLimits. PeriodAlignment` | Specifies whether the period starts on the date of consent creation or lines up with a calendar | Consent, Calendar
+| __Amount__ (1..1)  | `ControlParameters. PeriodicLimits. Amount` | A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
+| __Currency__ (1..1) | `ControlParameters. PeriodicLimits. Currency` | A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds". | ActiveOrHistoricCurrencyCode
+| __VRPType__ (1..*) | `ControlParameters. VRPType` | The types of payments that can be made under this VRP consent. This can be used to indicate whether this include sweeping payment or other ecommerce payments. | OBVRPConsentType - Namespaced Enumeration
+| __PSUAuthenticationMethods__ (1..M) | `ControlParameters. __PSUAuthenticationMethods___` | Indicates that the PSU authentication methods supported.  | OBVRPAuthenticationMethods - Namespaced Enumeration
+| __SupplementaryData__ (0..1) | `ControlParameters. SupplementaryData` | Additional information that can not be captured in the structured fields and/or any other specific block  | *
+
+#### Examples of Periodic Limits
+
+##### Example 1
+``` json
+
+// created on 06-Jun-2021
+{
+  "PeriodType": "Month",
+  "PeriodAlignment": "Calendar",
+  "Amount": {
+    "Amount": "300.00",
+    "Currency": "GBP"
+  }
+}
+```
+
+| Period | Start | End | Applicable Limit
+|--------|-------|------|-----|
+| 1      | 06-Jun-2021 | 30-Jun-2021 | 250.00 GBP |
+| 2      | 01-Jul-2021 | 31-Jul-2021 | 300.00 GBP |
+| 3      | 01-Aug-2021 | 31-Aug-2021 | 300.00 GBP |
+
+##### Example 2
+
+``` json
+// created on 05-Jun-2021
+{
+  "PeriodType": "Month",
+  "PeriodAlignment": "Consent",
+  "Amount": {
+    "Amount": "500.00",
+    "Currency": "GBP"
+  }
+}
+```
+
+| Period | Start | End | Applicable Limit
+|--------|-------|------|----|
+| 1      | 05-Jun-2021 | 04-Jul-2021 | 500.00 GBP |
+| 2      | 05-Jul-2021 | 04-Jul-2021 | 500.00 GBP |
+| 3      | 05-Aug-2021 | 04-Aug-2021 | 500.00 GBP |
+
+##### Example 3
+
+``` json
+// created on 05-Jun-2021
+{
+  "PeriodType": "Year",
+  "PeriodAlignment": "Calendar",
+  "Amount": {
+    "Amount": "500.00",
+    "Currency": "GBP"
+  }
+}
+```
+
+| Period | Start | End | Applicable Limit
+|--------|-------|------|-----|
+| 1      | 06-Jun-2021 | 31-Dec-2021 | 286.30 GBP (500 x 209 / 365) |
+| 2      | 01-Jan-2021 | 31-Dec-2022 | 500.00 GBP |
+| 3      | 01-Jan-2021 | 31-Dec-2023 | 500.00 GBP |
+
+##### Example 4
+
+``` json
+// created on 05-Jun-2021
+{
+  "PeriodType": "Year",
+  "PeriodAlignment": "Consent",
+  "Amount": {
+    "Amount": "500.00",
+    "Currency": "GBP"
+  }
+}
+```
+
+| Period | Start | End | Applicable Limit
+|--------|-------|------|-----|
+| 1      | 05-Jun-2021 | 04-Jun-2022 | 500.00 GBP |
+| 2      | 05-Jun-2022 | 04-Jun-2023 | 500.00 GBP |
+| 3      | 05-Jun-2023 | 04-Jun-2024 | 500.00 GBP |
+
 
 ### OBRisk1
 
@@ -197,6 +295,7 @@ The Risk block is a common class used in requests and responses
 | Name |Path |Definition | Type |
 | ---- |-----|---------- |------|
 | __Data__ (0..1) | `Data`
+| __Data. ReadRefundAccount__ (0..1) | `Data. ReadRefundAccount` | Indicates whether the `RefundAccount` object should be included in the response | Yes No
 | __ControlParameters__ (1..1) | `Data. ControlParameters` | The control parameters under which this VRP must operate | [OBDomesticVRPControlParameters](#OBDomesticVRPControlParameters)
 | __Initiation__ (1..1) | `Data. Initiation` | The parameters of the VRP consent that should remain unchanged for each payment under this VRP | [OBDomesticVRPInitiation](#OBDomesticVRPInitiation)
 | __Risk__ (1..1) | `Risk` | The consent payload is sent by the initiating party to the ASPSP. It is used to request a consent to move funds from the debtor account to a creditor. | OBRisk
@@ -209,6 +308,7 @@ The Risk block is a common class used in requests and responses
 | ---- |-----|---------- |------|
 | __Data__ (1..1) | `Data`
 | __ConsentId__  (1..1)| `Data. ConsentId` | Unique identification as assigned by the ASPSP to uniquely identify the consent resource.      | Max128Text
+| __Data. ReadRefundAccount__ (0..1) | `Data. ReadRefundAccount` | Indicates whether the `RefundAccount` object should be included in the response | Yes No
 | __CreationDateTime__ (1..1)| `Data. CreationDateTime` | Date and time at which the resource was created.|ISODateTime
 | __Status__ (1..1) | `Data. Status` | Specifies the status of resource in code form.  |Authorised AwaitingAuthorisation Rejected Revoked Expired
 | __StatusUpdateDateTime__ (1..1)| `Data. StatusUpdateDateTime` |Date and time at which the resource status was updated.  | ISODateTime  
@@ -227,7 +327,7 @@ The OBVRPFundsConfirmationRequest object must be used to request funds availabil
 | ---- |-----|---------- |------|
 | __Data__ (1..1) | `Data`
 | __ConsentId__ (1..1) | `Data. ConsentId` |Unique identification as assigned by the ASPSP to uniquely identify the funds confirmation consent resource.      | Max128Text
-| __Reference__ (1..1) | `Data. Reference` | Unique reference, as assigned by the PISP, to unambiguously refer to the request related to the payment transaction.|Max35Text
+| __Reference__ (1..1) | `Data. Reference` | Unique reference, as assigned by the PISP, to unambiguously refer to the request related to the payment transaction. This must be the same value as the `Reference` field in the consent. |Max35Text
 | __InstructedAmount__ (1..1) | `Data. InstructedAmount` | Amount of money to be confirmed as available funds in the debtor account. Contains an Amount and a Currency.      |OBActiveOrHistoricCurrencyAndAmount
 | __Amount__ (1..1) | `Data. InstructedAmount. Amount`| A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
 | __Currency__ (1..1) | `Data. InstructedAmount. Currency`       |A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds". |ActiveOrHistoricCurrencyCode `^[A-Z]{3,3}$`
@@ -251,8 +351,7 @@ The confirmation of funds response contains the result of a funds availability c
 | __Reference__ (1..1)  | `Data. Reference`   |Unique reference, as assigned by the CBPII, to unambiguously refer to the request related to the payment transaction.   |Max35Text
 | __FundsAvailableResult__ (1..1)  | `Data. FundsAvailableResult` |Result of a funds availability check.     |OBPAFundsAvailableResult1
 | __FundsAvailableDateTime__  (1..1)  | `Data. FundsAvailableResult. FundsAvailableDateTime`       |Date and time at which the funds availability check was generated.     |ISODateTime
-| __FundsAvailable__ (1..1)  | `Data. FundsAvailableResult. FundsAvailable`      |Availaility result, clearly indicating the availability of funds given the Amount in the request.   | Available AvailableWithOverdraft NotAvailable      |   |
-| __DebtorAccount__ (1..1)  | `Data. FundsAvailableResult. DebtorAccount`       |The account in which these funds are available     |OBCashAccountDebtorWithName
+| __FundsAvailable__ (1..1)  | `Data. FundsAvailableResult. FundsAvailable`      |Availaility result, clearly indicating the availability of funds given the Amount in the request.   | Available  NotAvailable      |   |
 | __InstructedAmount__ (1..1)  | `Data. InstructedAmount`     |Amount of money to be confirmed as available funds in the debtor account. Contains an Amount and a Currency.   |OBActiveOrHistoricCurrencyAndAmount
 | __Amount__ (1..1)  | `Data. InstructedAmount. Amount`     |A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
 | __Currency__ (1..1)  | `Data. InstructedAmount. Currency`   |A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds".      |ActiveOrHistoricCurrencyCode

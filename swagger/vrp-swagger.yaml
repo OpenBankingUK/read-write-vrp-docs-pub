@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: OBIE VRP Profile
   description: VRP swagger
-  version: 1.0.0-draft1
+  version: 3.1.8-rc1
 tags:
   - name: variable-recurring-payments
 paths:
@@ -79,6 +79,13 @@ components:
             - Initiation
             - DebtorAccount
           properties:
+            ReadRefundAccount:
+              type: string
+              enum:
+                - Yes
+                - No
+              description: >
+                Indicates whether information about RefundAccount should be included in the payment response.
             ConsentId:
               type: string              
               description: >
@@ -123,6 +130,13 @@ components:
             - Initiation
 
           properties:
+            ReadRefundAccount:
+              type: string
+              enum:
+                - Yes
+                - No
+              description: >
+                Indicates whether information about RefundAccount should be included in the payment response.
             ControlParameters:
               $ref: '#/components/schemas/OBDomesticVRPControlParameters'
             Initiation:
@@ -146,11 +160,6 @@ components:
           format: date-time
           description: ^
             End date time for which the consent remains valid. | ISODateTime
-        Reference:
-          type: string
-          maxLength: 35
-          description: ^
-            Unique reference, as assigned by the creditor, to unambiguously refer to the consent.     | Max35Text  
         MaximumIndividualAmount:
           type: object
           required:
@@ -165,24 +174,61 @@ components:
               type: string
               description: ^
                 A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds".   | ActiveOrHistoricCurrencyCode  
-        MaximumMonthlyAmount:
-          type: object
-          required:
-            - Amount
-            - Currency
-          properties:
-            Amount:
-              type: string
-              description: ^
-                A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
-            Currency:
-              type: string
-              description: ^
-                A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds".   | ActiveOrHistoricCurrencyCode          
+        PeriodicLimits:
+          type: array
+          items:
+            type: object
+            required:
+              - PeriodType
+              - PeriodAlignment
+              - Amount
+              - Currency
+            properties:
+              PeriodType:
+                type: string
+                enum: 
+                  - Day
+                  - Week
+                  - Fortnight
+                  - Month
+                  - Half-year
+                  - Year
+                description: ^
+                  Period type for this period limit
+              PeriodAlignment:
+                type: string
+                enum:
+                  - Consent
+                  - Calendar
+                description: ^
+                  Specifies whether the period starts on the date of consent creation or lines up with a calendar 
+              Amount:
+                type: string
+                description: ^
+                  A number of monetary units specified in an active currency where the unit of currency is explicit and compliant with ISO 4217.
+              Currency:
+                type: string
+                description: ^
+                  A code allocated to a currency by a Maintenance Agency under an international identification scheme, as described in the latest edition of the international standard ISO 4217 "Codes for the representation of currencies and funds".   | ActiveOrHistoricCurrencyCode          
         VRPType:
-          type: string
+          type: array
+          items: 
+            type: string
+          minItems: 1
           description: ^
-            The types of payments that can be made under this VRP consent. This can be used to indicate whether this include sweeping payment or other ecommerce payments. A value of `UK.OBIE.VRPType.Sweeping` can only be used when the API is called with the `vrp-consents:sweeping` scope. A value of `UK.OBIE.VRPType.Other` can only be used when the API is called with teh `vrp-consents:other` scope. | OBVRPConsentType - Namespaced Enumeration
+            The types of payments that can be made under this VRP consent. This can be used to indicate whether this include sweeping payment or other ecommerce payments.  | OBVRPConsentType - Namespaced Enumeration
+        PSUAuthenticationMethods:
+          type: array
+          minItems: 1
+          description: ^
+            Indicates that the PSU authentication methods supported.  | OBVRPAuthenticationMethods - Namespaced Enumeration
+          items:
+            type: string
+        SupplementaryData:
+          type: object
+          description: ^
+            Additional information that can not be captured in the structured fields and/or any other specific block 
+
 
     OBDomesticVRPInitiation:
       type: object
@@ -193,13 +239,32 @@ components:
           $ref: '#/components/schemas/OBBranchAndFinancialInstitutionIdentification6'
         CreditorAccount:
           $ref: '#/components/schemas/OBCashAccountCreditor3'
-
+        RemittanceInformation:
+          type: object
+          description: ^
+            Information supplied to enable the matching of an entry with the items that the transfer is intended to settle, such as commercial invoices in an accounts' receivable system.
+          properties:
+            Unstructured:
+              type: string
+              maxLength: 140 
+              description: ^
+                Information supplied to enable the matching/reconciliation of an entry with the items that the payment is intended to settle, such as commercial invoices in an accounts' receivable system, in an unstructured form.
+            Reference:
+              type: string
+              maxLength: 35
+              description : ^
+                Unique reference, as assigned by the creditor,
+                to unambiguously refer to the payment transaction. 
+                Usage - If available, the initiating party should provide this reference in the structured remittance information, to enable reconciliation by the creditor upon receipt of the amount of money. If the business context requires the use of a creditor reference or a payment remit identification, and only one identifier can be passed through the end-to-end chain, the creditor's reference or payment remittance identification should be quoted in the end-to-end transaction identification.
     OBCashAccountDebtorWithName:
       type: object
       required:
         - SchemeName
         - Identification
         - Name
+      description: ^
+        Only incuded in the response if `Data. ReadRefundAccount` is set to `Yes` in the consent.
+
       properties:
         SchemeName:
           type: string
@@ -317,6 +382,7 @@ components:
           type: object
           required:
             - ConsentId
+            - PSUAuthenticationMethod
             - Initiation
             - Instruction
             - Risk
@@ -326,6 +392,10 @@ components:
               maxLength: 128
               description: |-
                 Identifier for the Domestic VRP Consent that this payment is made under.
+            PSUAuthenticationMethod:
+              type: string
+              description: ^
+                The authentication method that was used to authenicate the PSU.   | OBVRPAuthenticationMethods - Namespaced Enumeration
             Initiation:
               $ref: '#/components/schemas/OBDomesticVRPInitiation'
             Instruction:
@@ -349,7 +419,6 @@ components:
             - CreationDateTime
             - Status
             - StatusUpdateDateTime
-            - Refund
             - Initiation
             - Instruction
             - DebtorAccount
@@ -417,8 +486,6 @@ components:
               $ref: '#/components/schemas/OBDomesticVRPInitiation'
             Instruction:
               $ref: '#/components/schemas/OBDomesticVRPInstruction'
-            MultiAuthorisation:
-              $ref: '#/components/schemas/OBMultiAuthorisation1'
             DebtorAccount:
               $ref: '#/components/schemas/OBCashAccountDebtorWithName'
         Risk:
@@ -583,7 +650,6 @@ components:
       required:
         - FundsAvailableDateTime
         - FundsAvailable
-        - DebtorAccount
       properties:
         FundsAvailableDateTime:
           type: string
@@ -596,38 +662,7 @@ components:
             Availaility result, clearly indicating the availability of funds given the Amount in the request.
           enum:
             - Available
-            - AvailablaWithOverdraft
             - NotAvailable
-        DebtorAccount:
-          $ref: '#/components/schemas/OBCashAccountDebtorWithName'
-
-    OBMultiAuthorisation1:
-      type: object
-      required:
-        - Status
-      description: |-
-        The multiple authorisation flow response from the ASPSP.
-      properties:
-        Status:
-          $ref: '#/components/schemas/OBExternalStatus2Code'
-        NumberRequired:
-          type: number
-          description: |-
-            Number of authorisations required for payment order (total required at the start of the multi authorisation journey).	
-        NumberReceived:
-          type: number
-          description: |-
-            Number of authorisations received.
-        LastUpdateTime:
-          type: string
-          format: datetime
-          description: |-
-            Last date and time at the authorisation flow was updated.	
-        ExpirationDateTime:
-          type: string
-          format: datetime
-          description: |-
-            Date and time at which the requested authorisation flow must be completed.	
 
     OBCharge2:
       type: object
@@ -679,6 +714,8 @@ components:
               Usage: The end-to-end identification can be used for reconciliation or to link tasks relating to the transaction. 
               It can be included in several messages related to the transaction. 
               OB: The Faster Payments Scheme can only access 31 characters for the EndToEndIdentification field
+        RemittanceInformation:
+          $ref: '#/components/schemas/OBVRPRemittanceInformation'
         LocalInstrument:
           $ref: '#/components/schemas/OBExternalLocalInstrument1Code'
         InstructedAmount:
@@ -687,6 +724,26 @@ components:
           $ref: '#/components/schemas/OBBranchAndFinancialInstitutionIdentification6'
         CreditorAccount:
           $ref: '#/components/schemas/OBCashAccountCreditor3'
+        SupplementaryData:
+          type: object
+          description: ^
+            Additional information that can not be captured in the structured fields and/or any other specific block 
+
+    OBVRPRemittanceInformation:
+      type: object
+      description: |
+        Information supplied to enable the matching of an entry with the items that the transfer is intended to settle, such as commercial invoices in an accounts' receivable system.
+      properties:
+        Unstructured:
+          type: string
+          maxLength: 140
+          description: |
+            Information supplied to enable the matching/reconciliation of an entry with the items that the payment is intended to settle, such as commercial invoices in an accounts' receivable system, in an unstructured form. 
+        Reference:
+          type: string
+          maxLength: 35
+          description: |
+            Unique reference, as assigned by the creditor, to unambiguously refer to the payment transaction. The PISP must populate this with the same value as specified in the ControlParameters.Reference field of the consent.
 
     OBExternalAccountIdentification4Code:
       type: string
